@@ -100,7 +100,7 @@ export default function LanternSky() {
     return () => clearInterval(iv);
   }, []);
 
-  const releaseLantern = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+  const releaseLantern = useCallback((e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     if (!containerRef.current) return;
     let clientX: number;
     if ('touches' in e) clientX = e.touches[0].clientX;

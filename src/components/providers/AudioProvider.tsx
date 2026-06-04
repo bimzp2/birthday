@@ -40,7 +40,7 @@ const TEMPO = 75; // Slower, more emotional
 export function AudioProvider({ children }: { children: ReactNode }) {
   // Volume extremely low for background ambience
   const [state, setState] = useState<AudioState>({ isPlaying: false, volume: 0.15, isMuted: false });
-  const audioCtx = useRef<window.AudioContext | null>(null);
+  const audioCtx = useRef<AudioContext | null>(null);
   const mainGain = useRef<GainNode | null>(null);
   const nextNoteTime = useRef(0);
   const currentNote = useRef(0);
@@ -51,8 +51,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     if (!audioCtx.current) {
       audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       mainGain.current = audioCtx.current.createGain();
-      mainGain.current.connect(audioCtx.current.destination);
-      mainGain.current.gain.value = state.volume;
+      if (mainGain.current) {
+        mainGain.current.connect(audioCtx.current.destination);
+        mainGain.current.gain.value = state.volume;
+      }
     }
   }, [state.volume]);
 
