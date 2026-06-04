@@ -157,11 +157,12 @@ export default function ScratchReveal() {
   const rotX  = useTransform(tiltY, [-300, 300], [7, -7]);
   const rotY  = useTransform(tiltX, [-300, 300], [-7, 7]);
 
-  const onMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined' && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     if (!containerRef.current) return;
-    const r = containerRef.current.getBoundingClientRect();
-    tiltX.set(e.clientX - r.left - r.width / 2);
-    tiltY.set(e.clientY - r.top  - r.height / 2);
+    const rect = containerRef.current.getBoundingClientRect();
+    tiltX.set(e.clientX - rect.left - rect.width / 2);
+    tiltY.set(e.clientY - rect.top - rect.height / 2);
   };
   const onLeave = () => { tiltX.set(0); tiltY.set(0); };
 
@@ -221,9 +222,8 @@ export default function ScratchReveal() {
       </AnimatePresence>
 
       {/* Card */}
-      <motion.div ref={containerRef}
-        className="relative rounded-3xl overflow-hidden z-10"
-        onMouseMove={onMove} onMouseLeave={onLeave}
+      <motion.div ref={containerRef} className="relative rounded-xl overflow-hidden cursor-crosshair z-10 mx-6 w-full"
+        onMouseMove={handleMouseMove} onMouseLeave={onLeave}
         style={{
           width: 'min(88vw, 380px)',
           minHeight: 320,

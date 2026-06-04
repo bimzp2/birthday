@@ -115,7 +115,7 @@ export default function EternalEnding() {
   };
 
   return (
-    <section ref={sectionRef} className="relative min-h-screen flex items-center justify-center overflow-hidden"
+    <section ref={sectionRef} className="relative min-h-[100dvh] flex items-center justify-center overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #0A0908 0%, #0d0a12 35%, #12101a 60%, #0d0a12 80%, #0A0908 100%)' }}>
 
       {/* Canvas */}

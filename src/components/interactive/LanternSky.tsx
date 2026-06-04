@@ -70,20 +70,34 @@ export default function LanternSky() {
     }));
 
     let t = 0, raf: number;
+    let isVisible = true;
+    
     const draw = () => {
-      t += 0.01;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const s of stars) {
-        const a = s.base * (0.45 + 0.55 * Math.sin(t * s.speed + s.phase));
-        ctx.beginPath();
-        ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = s.gold ? `rgba(212,165,116,${a})` : `rgba(245,230,211,${a})`;
-        ctx.fill();
+      if (isVisible) {
+        t += 0.01;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const s of stars) {
+          const a = s.base * (0.45 + 0.55 * Math.sin(t * s.speed + s.phase));
+          ctx.beginPath();
+          ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = s.gold ? `rgba(212,165,116,${a})` : `rgba(245,230,211,${a})`;
+          ctx.fill();
+        }
       }
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+    });
+    observer.observe(canvas);
+
+    return () => { 
+      cancelAnimationFrame(raf); 
+      window.removeEventListener('resize', resize); 
+      observer.disconnect();
+    };
   }, []);
 
   /* ── Periodic shooting stars ── */

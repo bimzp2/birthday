@@ -174,6 +174,13 @@ export default function InteractiveCake() {
   const rX  = useTransform(cY, [-200, 200], [10, -10]);
   const rY  = useTransform(cX, [-200, 200], [-10, 10]);
 
+  const handleCakeMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof window !== 'undefined' && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    cX.set(e.clientX - r.left - r.width / 2);
+    cY.set(e.clientY - r.top - r.height / 2);
+  };
+
   return (
     <section className="relative py-28 flex flex-col items-center justify-center overflow-hidden"
       style={{ background: `linear-gradient(180deg, ${DARK} 0%, #1A1510 50%, ${DARK} 100%)`, minHeight: '90vh' }}>
@@ -216,7 +223,7 @@ export default function InteractiveCake() {
       <motion.div
         className="relative cursor-pointer z-10"
         style={{ perspective: 1200, width: 'min(90vw, 360px)' }}
-        onMouseMove={e => { const r = e.currentTarget.getBoundingClientRect(); cX.set(e.clientX - r.left - r.width / 2); cY.set(e.clientY - r.top - r.height / 2); }}
+        onMouseMove={handleCakeMove}
         onMouseLeave={() => { cX.set(0); cY.set(0); setHovered(false); }}
         onMouseEnter={() => { setHovered(true); playHoverTick(getCtx); }}
         onClick={handleBlow}

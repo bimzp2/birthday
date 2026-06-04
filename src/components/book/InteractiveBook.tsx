@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, FormEvent } from 'react';
+import { useState, useRef, FormEvent, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DARK = '#0A0908';
@@ -34,19 +34,26 @@ export default function InteractiveBook() {
     }
   };
 
-  return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden py-20 px-4"
-      style={{ background: 'linear-gradient(180deg, #0A0908 0%, #1A1510 50%, #0A0908 100%)' }}>
-      
-      {/* Background illumination */}
-      <div className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at 50% 50%, ${GOLD}15 0%, transparent 60%)`,
-        }} />
+  const [isMobile, setIsMobile] = useState(false);
 
-      <div className="text-center absolute top-10 w-full" style={{ opacity: isOpen ? 0 : 1, transition: 'opacity 1s' }}>
-         <p className="font-serif italic text-lg" style={{ color: `${GOLD}80` }}>Sentuh bukunya untuk membuka</p>
-      </div>
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 640);
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return (
+    <section className="relative min-h-[100dvh] flex flex-col items-center justify-center py-20 overflow-hidden"
+      style={{ background: 'linear-gradient(135deg, #1A120E 0%, #0A0908 100%)' }}>
+      
+      {/* Ambient dust */}
+      {Array.from({ length: 30 }).map((_, i) => (
+        <motion.div key={i} className="absolute rounded-full pointer-events-none"
+          style={{ width: Math.random() * 3, height: Math.random() * 3, background: GOLD, left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+          animate={{ y: [0, -100], opacity: [0, 0.3, 0] }}
+          transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, delay: Math.random() * 5 }} />
+      ))}
 
       {/* Book Container */}
       <div className="relative w-full flex items-center justify-center"
@@ -54,7 +61,10 @@ export default function InteractiveBook() {
         
         {/* The Book (Centers itself based on state) */}
         <motion.div className="relative"
-          animate={{ x: isOpen ? '50%' : '0%' }}
+          animate={{ 
+            x: isOpen ? '50%' : '0%',
+            scale: isOpen && isMobile ? 0.55 : 1
+          }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           style={{ 
             width: 'min(85vw, 55vh, 400px)', 

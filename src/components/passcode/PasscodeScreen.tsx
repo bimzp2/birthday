@@ -142,6 +142,7 @@ export default function PasscodeScreen({ onSuccess }: PasscodeScreenProps) {
   const rotateY = useTransform(cardX, [-200, 200], [-10, 10]);
 
   const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof window !== 'undefined' && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     const rect = e.currentTarget.getBoundingClientRect();
     cardX.set(e.clientX - rect.left - rect.width / 2);
     cardY.set(e.clientY - rect.top - rect.height / 2);

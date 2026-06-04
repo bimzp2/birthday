@@ -147,29 +147,41 @@ export default function CinematicIntro({ onBegin }: CinematicIntroProps) {
     });
 
     let time = 0;
+    let isVisible = true;
+    
     const animate = () => {
-      time += 0.003;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of particlesRef.current) {
-        p.baseX += p.speedX;
-        p.baseY += p.speedY;
-        if (p.baseX < -10) p.baseX = canvas.width + 10;
-        if (p.baseX > canvas.width + 10) p.baseX = -10;
-        if (p.baseY < -10) p.baseY = canvas.height + 10;
-        if (p.baseY > canvas.height + 10) p.baseY = -10;
-        p.x = p.baseX + Math.sin(time + p.phase) * 8;
-        p.y = p.baseY + Math.cos(time + p.phase) * 8;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        // Softer, dreamy warm colors
-        ctx.fillStyle = `rgba(250, 220, 210, ${p.opacity})`;
-        ctx.fill();
+      if (isVisible) {
+        time += 0.003;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const p of particlesRef.current) {
+          p.baseX += p.speedX;
+          p.baseY += p.speedY;
+          if (p.baseX < -10) p.baseX = canvas.width + 10;
+          if (p.baseX > canvas.width + 10) p.baseX = -10;
+          if (p.baseY < -10) p.baseY = canvas.height + 10;
+          if (p.baseY > canvas.height + 10) p.baseY = -10;
+          p.x = p.baseX + Math.sin(time + p.phase) * 8;
+          p.y = p.baseY + Math.cos(time + p.phase) * 8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(250, 220, 210, ${p.opacity})`;
+          ctx.fill();
+        }
       }
       rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
 
-    return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener('resize', resize); };
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+    });
+    observer.observe(canvas);
+
+    return () => { 
+      cancelAnimationFrame(rafRef.current); 
+      window.removeEventListener('resize', resize); 
+      observer.disconnect();
+    };
   }, []);
 
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -195,7 +207,7 @@ export default function CinematicIntro({ onBegin }: CinematicIntroProps) {
   };
 
   return (
-    <motion.div className="relative min-h-screen w-full overflow-hidden flex items-center justify-center"
+    <motion.div className="relative min-h-[100dvh] w-full overflow-hidden flex items-center justify-center"
       onMouseMove={handleGlobalMove}
       style={{ backgroundColor: DARK }}
       initial={{ scale: 1 }}
