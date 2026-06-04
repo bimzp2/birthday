@@ -181,45 +181,77 @@ function AppInner() {
                 <HeroFloral pos="br" />
 
                 <div className="relative z-10 text-center px-6 max-w-3xl">
-                  <motion.p className="tracking-[0.3em] uppercase mb-5 sm:mb-6"
-                    style={{ color: 'rgba(212,165,116,0.6)', fontFamily: "'Inter', sans-serif", fontSize: 'clamp(0.55rem, 1.1vw, 0.75rem)' }}
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  {/* Pre-title tag */}
+                  <motion.p className="tracking-[0.35em] uppercase mb-5 sm:mb-6"
+                    style={{ color: 'rgba(212,165,116,0.55)', fontFamily: "'Inter', sans-serif", fontSize: 'clamp(0.5rem, 1vw, 0.68rem)', letterSpacing: '0.4em' }}
+                    initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     transition={{ duration: 1.2, delay: 0.3 }}>
-                    a celebration of you
+                    — a celebration of you —
                   </motion.p>
 
+                  {/* Main title */}
                   <motion.h1 className="font-serif"
-                    style={{ color: '#FFF8F0', fontWeight: 300, fontSize: 'clamp(2rem, 5vw + 0.5rem, 5.5rem)', lineHeight: 1.15, letterSpacing: '-0.02em' }}
-                    initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 1.4, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}>
+                    style={{ color: '#FFF8F0', fontWeight: 300, fontSize: 'clamp(2.2rem, 5.5vw + 0.5rem, 6rem)', lineHeight: 1.1, letterSpacing: '-0.02em' }}
+                    initial={{ opacity: 0, y: 30, filter: 'blur(12px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    transition={{ duration: 1.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}>
                     Selamat Ulang Tahun,
                     <br />
-                    <span className="inline-block mt-1" style={{ color: '#D4A574' }}>Asa</span>
+                    <motion.span
+                      className="inline-block mt-2"
+                      style={{ color: '#D4A574', textShadow: '0 0 40px rgba(212,165,116,0.4)' }}
+                      animate={{ textShadow: ['0 0 30px rgba(212,165,116,0.3)', '0 0 60px rgba(212,165,116,0.6)', '0 0 30px rgba(212,165,116,0.3)'] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 2 }}>Asa</motion.span>
                   </motion.h1>
 
-                  <motion.p className="font-serif mt-5 sm:mt-6"
-                    style={{ color: 'rgba(245,230,211,0.55)', fontWeight: 300, fontSize: 'clamp(0.85rem, 1.6vw, 1.2rem)', lineHeight: 1.7 }}
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    transition={{ duration: 1, delay: 1 }}>
+                  {/* Subtitle */}
+                  <motion.p className="font-serif mt-6 sm:mt-8"
+                    style={{ color: 'rgba(245,230,211,0.5)', fontWeight: 300, fontSize: 'clamp(0.9rem, 1.7vw, 1.25rem)', lineHeight: 1.75 }}
+                    initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    transition={{ duration: 1.2, delay: 1.1, ease: [0.22, 1, 0.36, 1] }}>
                     ada banyak hal baik yang pengen aku rayain bareng kamu
                   </motion.p>
 
-                  <motion.div className="mt-7 mx-auto h-px w-14"
-                    style={{ background: 'linear-gradient(90deg, transparent, rgba(212,165,116,0.35), transparent)' }}
-                    initial={{ scaleX: 0 }} animate={{ scaleX: 1 }}
-                    transition={{ duration: 1.2, delay: 1.4 }} />
+                  {/* Animated divider */}
+                  <motion.div className="mt-8 flex items-center justify-center gap-3"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5, duration: 1 }}>
+                    <motion.div className="h-px"
+                      style={{ background: 'linear-gradient(90deg, transparent, rgba(212,165,116,0.4))' }}
+                      initial={{ width: 0 }} animate={{ width: 48 }} transition={{ duration: 1, delay: 1.6 }} />
+                    <motion.div
+                      animate={{ rotate: [0, 360] }} transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                      style={{ opacity: 0.4 }}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M5 0 L5.8 4 L10 5 L5.8 6 L5 10 L4.2 6 L0 5 L4.2 4 Z" fill="#D4A574" />
+                      </svg>
+                    </motion.div>
+                    <motion.div className="h-px"
+                      style={{ background: 'linear-gradient(270deg, transparent, rgba(212,165,116,0.4))' }}
+                      initial={{ width: 0 }} animate={{ width: 48 }} transition={{ duration: 1, delay: 1.6 }} />
+                  </motion.div>
 
-                  <motion.div className="mt-20 sm:mt-24 flex flex-col items-center gap-2"
-                    initial={{ opacity: 0 }} animate={{ opacity: 0.25 }}
-                    transition={{ delay: 2.2, duration: 1.2 }}>
-                    <span className="tracking-[0.25em] uppercase"
-                      style={{ color: 'rgba(245,230,211,0.4)', fontFamily: "'Inter', sans-serif", fontSize: '0.5rem' }}>
+                  {/* Sparkle dots */}
+                  {[{ x: -60, y: -30, d: 2 }, { x: 55, y: -40, d: 1.5 }, { x: -80, y: 20, d: 1.2 }, { x: 70, y: 15, d: 1.8 }].map((s, i) => (
+                    <motion.div key={i} className="absolute rounded-full pointer-events-none"
+                      style={{ width: s.d * 2, height: s.d * 2, background: '#D4A574', boxShadow: '0 0 6px #D4A574', left: `calc(50% + ${s.x}px)`, top: `calc(50% + ${s.y}px)` }}
+                      initial={{ opacity: 0, scale: 0 }} animate={{ opacity: [0, 0.6, 0], scale: [0, 1, 0] }}
+                      transition={{ duration: 2.5, delay: 1.8 + i * 0.3, repeat: Infinity, ease: 'easeInOut' }} />
+                  ))}
+
+                  {/* Scroll indicator */}
+                  <motion.div className="mt-20 sm:mt-28 flex flex-col items-center gap-2"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    transition={{ delay: 2.5, duration: 1.2 }}>
+                    <span className="tracking-[0.3em] uppercase"
+                      style={{ color: 'rgba(245,230,211,0.3)', fontFamily: "'Inter', sans-serif", fontSize: '0.48rem' }}>
                       scroll
                     </span>
-                    <motion.div className="w-px h-6"
-                      style={{ background: 'linear-gradient(to bottom, rgba(212,165,116,0.3), transparent)' }}
-                      animate={{ y: [0, 5, 0] }}
-                      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }} />
+                    <motion.div className="flex flex-col items-center gap-0.5"
+                      animate={{ y: [0, 6, 0] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}>
+                      <div className="w-px h-5" style={{ background: 'linear-gradient(to bottom, rgba(212,165,116,0.4), transparent)' }} />
+                      <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
+                        <path d="M1 1 L4 4 L7 1" stroke="rgba(212,165,116,0.4)" strokeWidth="1" strokeLinecap="round" />
+                      </svg>
+                    </motion.div>
                   </motion.div>
                 </div>
               </section>

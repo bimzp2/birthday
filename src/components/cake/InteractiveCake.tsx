@@ -1,260 +1,336 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 
-const DARK = '#0A0908';
-const GOLD = '#D4A574';
+const DARK  = '#0A0908';
+const GOLD  = '#D4A574';
+const IVORY = '#FFF8F0';
+const ROSE  = '#E8C4C4';
+const CHAMPAGNE = '#F5E6D3';
 
-/**
- * InteractiveCake — A beautiful birthday cake with a candle.
- * User clicks/taps to blow it out, triggering SFX and confetti.
- */
-export default function InteractiveCake() {
-  const [blown, setBlown] = useState(false);
-  const [smoke, setSmoke] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  // Play a synthetic magical "whoosh/chime" sound
-  const playBlowSound = () => {
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-
-      // Whoosh sound (white noise with filter sweep)
-      const bufferSize = ctx.sampleRate * 2;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = buffer;
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.Q.value = 1;
-      filter.frequency.setValueAtTime(4000, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 1.5);
-
-      const gainNode = ctx.createGain();
-      gainNode.gain.setValueAtTime(0, ctx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.1);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
-
-      noiseSource.connect(filter);
-      filter.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      noiseSource.start();
-
-      // Magical chime (sine wave sweep)
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.5);
-      
-      const oscGain = ctx.createGain();
-      oscGain.gain.setValueAtTime(0, ctx.currentTime);
-      oscGain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.1);
-      oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 2);
-
-      osc.connect(oscGain);
-      oscGain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 2);
-
-    } catch (e) {
-      console.warn('Audio play failed', e);
-    }
+/* ── Audio helpers ──────────────────────────────────── */
+function useAudioCtx() {
+  const ref = useRef<AudioContext | null>(null);
+  const get = () => {
+    if (!ref.current) ref.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (ref.current.state === 'suspended') ref.current.resume();
+    return ref.current;
   };
+  return get;
+}
 
-  const handleBlow = () => {
+function playMagicalBlow(getCtx: () => AudioContext) {
+  try {
+    const ctx = getCtx();
+    const t   = ctx.currentTime;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = buf;
+    const filt  = ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.setValueAtTime(3000, t); filt.frequency.exponentialRampToValueAtTime(80, t + 1.2);
+    const gain  = ctx.createGain(); gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.4, t + 0.08); gain.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+    noise.connect(filt); filt.connect(gain); gain.connect(ctx.destination); noise.start();
+    // Chime
+    [800, 1200, 1600, 2000].forEach((freq, i) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t + i * 0.07); g.gain.linearRampToValueAtTime(0.15, t + i * 0.07 + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 1.8);
+      o.connect(g); g.connect(ctx.destination); o.start(t + i * 0.07); o.stop(t + i * 0.07 + 2);
+    });
+  } catch {}
+}
+
+function playHoverTick(getCtx: () => AudioContext) {
+  try {
+    const ctx = getCtx();
+    const o   = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880;
+    const g   = ctx.createGain(); g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.01); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.15);
+  } catch {}
+}
+
+/* ── Candle flame component ─────────────────────────── */
+function CandleFlame({ blown, small = false }: { blown: boolean; small?: boolean }) {
+  const s = small ? 0.65 : 1;
+  return (
+    <AnimatePresence>
+      {!blown && (
+        <motion.div style={{ transformOrigin: 'bottom center', scale: s }}
+          exit={{ scaleY: 0, opacity: 0, transition: { duration: 0.15 } }}>
+          {/* Outer flame */}
+          <motion.div className="relative"
+            animate={{ scaleY: [1, 1.18, 0.88, 1.12, 1], scaleX: [1, 0.88, 1.08, 0.92, 1], rotate: [-4, 5, -3, 4, -4] }}
+            transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}>
+            <div style={{
+              width: 14, height: 24,
+              borderRadius: '50% 50% 30% 30% / 65% 65% 35% 35%',
+              background: 'linear-gradient(to top, #FF3800 0%, #FF8C00 35%, #FFD700 70%, rgba(255,255,220,0.6) 100%)',
+              boxShadow: '0 0 12px #FF6600, 0 0 24px #FF880060, 0 0 40px #FFB30030',
+            }} />
+            {/* Inner white core */}
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2" style={{
+              width: 5, height: 10,
+              borderRadius: '50% 50% 30% 30% / 65% 65% 35% 35%',
+              background: 'rgba(255,255,255,0.9)',
+              filter: 'blur(1px)',
+            }} />
+          </motion.div>
+          {/* Glow ring */}
+          <motion.div className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(255,160,0,0.25) 0%, transparent 70%)', width: 40, height: 40, top: -10, left: -13, filter: 'blur(6px)' }}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ── Single candle ──────────────────────────────────── */
+function Candle({ blown, color, offsetX = 0, small = false }: { blown: boolean; color: string; offsetX?: number; small?: boolean }) {
+  return (
+    <div className="relative flex flex-col items-center" style={{ marginLeft: offsetX, zIndex: 5 }}>
+      <div className="relative" style={{ marginBottom: -2 }}>
+        <CandleFlame blown={blown} small={small} />
+        {/* Smoke */}
+        <AnimatePresence>
+          {blown && (
+            <motion.div className="absolute -top-8 left-1/2 -translate-x-1/2 pointer-events-none"
+              initial={{ opacity: 0, y: 0, scaleX: 1 }}
+              animate={{ opacity: [0, 0.5, 0.3, 0], y: -50, scaleX: [1, 1.4, 1.8, 2.2], scaleY: [1, 0.9, 0.7, 0.4] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 2.5, ease: 'easeOut' }}>
+              {[0, 1, 2].map(i => (
+                <motion.div key={i} className="absolute rounded-full"
+                  style={{ width: 8 + i * 4, height: 8 + i * 4, background: 'radial-gradient(circle, rgba(140,140,140,0.3) 0%, transparent 70%)', filter: 'blur(3px)', left: -i * 4, top: i * 6 }}
+                  animate={{ x: [(i - 1) * 6, (i - 1) * -6], rotate: [0, 30 - i * 20] }}
+                  transition={{ duration: 2.5 - i * 0.3, ease: 'easeOut' }} />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      {/* Candle body */}
+      <div style={{ width: small ? 8 : 11, height: small ? 30 : 42, borderRadius: '2px 2px 1px 1px',
+        background: `linear-gradient(to right, rgba(255,255,255,0.4) 0%, ${color} 40%, rgba(0,0,0,0.1) 100%)`,
+        boxShadow: blown ? 'none' : `0 0 8px ${color}60`,
+        position: 'relative', overflow: 'hidden' }}>
+        {/* Stripe */}
+        <div style={{ position: 'absolute', top: '30%', left: 0, right: 0, height: '18%', background: 'rgba(255,255,255,0.15)', transform: 'skewY(-10deg)' }} />
+        {/* Wax drip */}
+        {!blown && <div style={{ position: 'absolute', top: -2, left: 1, width: 3, height: 6, background: color, borderRadius: '0 0 3px 3px', opacity: 0.7 }} />}
+      </div>
+    </div>
+  );
+}
+
+/* ── Confetti piece ─────────────────────────────────── */
+function ConfettiPiece({ i, total }: { i: number; total: number }) {
+  const angle   = (i / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+  const dist    = 80 + Math.random() * 160;
+  const colors  = [GOLD, ROSE, CHAMPAGNE, IVORY, '#FFD700', '#FF88A0', '#A0D8FF'];
+  const color   = colors[i % colors.length];
+  const isCircle = i % 3 === 0;
+  return (
+    <motion.div className="absolute pointer-events-none"
+      style={{
+        top: '30%', left: '50%',
+        width: isCircle ? 6 : 5 + Math.random() * 5,
+        height: isCircle ? 6 : 9 + Math.random() * 6,
+        backgroundColor: color,
+        borderRadius: isCircle ? '50%' : '2px',
+        boxShadow: `0 0 6px ${color}80`,
+      }}
+      initial={{ x: 0, y: 0, opacity: 1, scale: 0, rotate: 0 }}
+      animate={{
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist + 60,
+        opacity: [1, 1, 0],
+        scale: [0, 1, 0.6],
+        rotate: [0, Math.random() * 720 - 360],
+      }}
+      transition={{ duration: 1.8 + Math.random() * 0.8, ease: [0.2, 0, 0.8, 1], delay: i * 0.02 }}
+    />
+  );
+}
+
+/* ── Main component ─────────────────────────────────── */
+export default function InteractiveCake() {
+  const [blown, setBlown]       = useState(false);
+  const [showMsg, setShowMsg]   = useState(false);
+  const [glowing, setGlowing]   = useState(false);
+  const [hovered, setHovered]   = useState(false);
+  const getCtx = useAudioCtx();
+
+  const handleBlow = useCallback(() => {
     if (blown) return;
     setBlown(true);
-    setSmoke(true);
-    playBlowSound();
-    setTimeout(() => setSmoke(false), 3000);
-  };
+    playMagicalBlow(getCtx);
+    setTimeout(() => { setShowMsg(true); setGlowing(true); }, 800);
+  }, [blown, getCtx]);
 
-  const cakeX = useMotionValue(0);
-  const cakeY = useMotionValue(0);
-  const rotateX = useTransform(cakeY, [-150, 150], [8, -8]);
-  const rotateY = useTransform(cakeX, [-150, 150], [-8, 8]);
-
-  const handleCakeMove = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    cakeX.set(e.clientX - rect.left - rect.width / 2);
-    cakeY.set(e.clientY - rect.top - rect.height / 2);
-  };
-
-  const handleCakeLeave = () => {
-    cakeX.set(0);
-    cakeY.set(0);
-  };
+  // 3D tilt
+  const cX = useMotionValue(0), cY = useMotionValue(0);
+  const rX  = useTransform(cY, [-200, 200], [10, -10]);
+  const rY  = useTransform(cX, [-200, 200], [-10, 10]);
 
   return (
-    <section className="relative py-32 flex flex-col items-center justify-center overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #0A0908 0%, #1A1510 100%)', minHeight: '80vh' }}>
-      
-      <motion.div className="text-center mb-16 z-10"
-        initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 1 }}>
-        <h2 className="font-serif tracking-tight mb-4"
-          style={{ color: '#FFF8F0', fontWeight: 300, fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}>
+    <section className="relative py-28 flex flex-col items-center justify-center overflow-hidden"
+      style={{ background: `linear-gradient(180deg, ${DARK} 0%, #1A1510 50%, ${DARK} 100%)`, minHeight: '90vh' }}>
+
+      {/* Ambient glows */}
+      <motion.div className="absolute rounded-full pointer-events-none"
+        style={{ width: 'clamp(300px, 50vw, 600px)', height: 'clamp(300px, 50vw, 600px)', top: '10%', left: '50%', transform: 'translateX(-50%)', background: `radial-gradient(circle, ${blown ? GOLD : 'rgba(255,120,0)'}${blown ? '08' : '10'} 0%, transparent 70%)`, filter: 'blur(60px)' }}
+        animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
+
+      {/* Floating particles */}
+      {Array.from({ length: 20 }).map((_, i) => (
+        <motion.div key={i} className="absolute pointer-events-none rounded-full"
+          style={{ width: 2 + Math.random() * 4, height: 2 + Math.random() * 4, left: `${5 + Math.random() * 90}%`, background: i % 2 === 0 ? GOLD : ROSE, opacity: 0.05 + Math.random() * 0.1 }}
+          animate={{ y: [0, -(40 + Math.random() * 60)], opacity: [0.08, 0, 0.08], x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20] }}
+          transition={{ duration: 5 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 6, ease: 'easeInOut' }} />
+      ))}
+
+      {/* Heading */}
+      <motion.div className="text-center mb-14 z-10 px-6"
+        initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }} transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}>
+        <p className="font-serif tracking-[0.3em] uppercase mb-3"
+          style={{ color: `${GOLD}70`, fontSize: 'clamp(0.6rem, 1vw, 0.7rem)' }}>
+          untukmu
+        </p>
+        <h2 className="font-serif tracking-tight mb-2"
+          style={{ color: IVORY, fontWeight: 300, fontSize: 'clamp(2rem, 4.5vw, 3.8rem)', lineHeight: 1.15 }}>
           Waktunya Tiup Lilin
         </h2>
-        <p className="font-serif italic"
-          style={{ color: 'rgba(212,165,116,0.8)', fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)' }}>
-          {blown ? "Harapanmu sudah didengar semesta." : "Tutup mata, buat harapan, lalu ketuk lilinnya..."}
-        </p>
+        <motion.p className="font-serif italic"
+          style={{ color: `rgba(212,165,116,0.75)`, fontSize: 'clamp(0.9rem, 1.6vw, 1.1rem)' }}
+          key={blown ? 'blown' : 'not'}
+          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+          {blown ? 'Harapanmu sudah didengar semesta.' : 'Tutup mata, buat harapan, lalu ketuk lilinnya...'}
+        </motion.p>
       </motion.div>
 
-      {/* The Cake Scene */}
-      <motion.div className="relative cursor-pointer group flex items-end justify-center w-full" onClick={handleBlow} 
-        onMouseMove={handleCakeMove}
-        onMouseLeave={handleCakeLeave}
-        style={{ height: 'clamp(250px, 40vh, 350px)', perspective: 1000 }}>
-        <motion.div className="relative" style={{ 
-          width: 280, height: 300, 
-          transformOrigin: 'bottom center',
-          scale: 'clamp(0.7, 80vw / 280, 1.2)',
-          rotateX, rotateY, transformStyle: 'preserve-3d'
-        }}>
-        
-        {/* Glow ambient breathing */}
-        <motion.div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${GOLD}15 0%, transparent 60%)`, filter: 'blur(30px)' }}
-          animate={{ scale: [1, 1.1, 1], opacity: [0.6, 0.9, 0.6] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        />
+      {/* Cake scene */}
+      <motion.div
+        className="relative cursor-pointer z-10"
+        style={{ perspective: 1200, width: 'min(90vw, 360px)' }}
+        onMouseMove={e => { const r = e.currentTarget.getBoundingClientRect(); cX.set(e.clientX - r.left - r.width / 2); cY.set(e.clientY - r.top - r.height / 2); }}
+        onMouseLeave={() => { cX.set(0); cY.set(0); setHovered(false); }}
+        onMouseEnter={() => { setHovered(true); playHoverTick(getCtx); }}
+        onClick={handleBlow}
+      >
+        <motion.div style={{ rotateX: rX, rotateY: rY, transformStyle: 'preserve-3d' }}
+          animate={hovered && !blown ? { scale: 1.02 } : { scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 25 }}>
 
-        {/* Floating magic sparkles around the cake */}
-        {Array.from({ length: 15 }).map((_, i) => (
-          <motion.div key={`sparkle-${i}`} className="absolute pointer-events-none"
-            style={{
-              width: 4 + Math.random() * 4, height: 4 + Math.random() * 4,
-              left: `${-50 + Math.random() * 200}%`,
-              top: `${-20 + Math.random() * 120}%`,
-              backgroundColor: i % 2 === 0 ? '#D4A574' : '#F5E6D3',
-              borderRadius: '50%',
-              boxShadow: '0 0 10px rgba(212,165,116,0.5)',
-            }}
-            animate={{
-              y: [0, -30 - Math.random() * 30],
-              opacity: [0, 0.8, 0],
-              scale: [0, 1, 0],
-            }}
-            transition={{
-              duration: 2 + Math.random() * 3,
-              repeat: Infinity,
-              delay: Math.random() * 3,
-            }}
-          />
-        ))}
+          <div className="relative flex flex-col items-center" style={{ height: 340 }}>
 
-        {/* Glow ambient */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full pointer-events-none transition-opacity duration-1000"
-          style={{
-            background: 'radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 60%)',
-            opacity: blown ? 0 : 1,
-            filter: 'blur(20px)',
-          }} />
-
-        {/* Cake Base */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2" style={{ width: 200, height: 120 }}>
-          {/* Cake shadow */}
-          <div className="absolute -bottom-4 left-0 w-full h-10 rounded-[100px/20px]" style={{ background: 'rgba(26,22,20,0.1)', filter: 'blur(4px)' }} />
-          
-          {/* Bottom tier */}
-          <div className="absolute bottom-0 left-0 w-full h-16 rounded-[100px/20px]" style={{ background: '#F5E6D3', boxShadow: 'inset 0 -5px 15px rgba(212,165,116,0.2)' }} />
-          <div className="absolute bottom-14 left-0 w-full h-8 rounded-[100px/20px]" style={{ background: '#FFFDF9' }} />
-          
-          {/* Top tier */}
-          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-[140px] h-14 rounded-[70px/15px]" style={{ background: '#FAF0E6', boxShadow: 'inset 0 -5px 10px rgba(212,165,116,0.1)' }} />
-          <div className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 w-[140px] h-7 rounded-[70px/15px]" style={{ background: '#FFFDF9' }} />
-
-          {/* Frosting drips */}
-          <svg className="absolute bottom-12 left-0 w-full h-6" viewBox="0 0 200 24" fill="#FFFDF9">
-            <path d="M0,0 Q10,15 20,5 Q30,20 40,8 Q50,24 60,10 Q70,18 80,6 Q90,22 100,12 Q110,24 120,8 Q130,16 140,5 Q150,20 160,8 Q170,18 180,6 Q190,15 200,0 Z" />
-          </svg>
-        </div>
-
-        {/* Candle */}
-        <div className="absolute bottom-[130px] left-1/2 -translate-x-1/2" style={{ width: 12, height: 40 }}>
-          <div className="w-full h-full rounded-sm" style={{ background: 'linear-gradient(to right, #f2f2f2, #d9d9d9)' }}>
-            {/* Stripes */}
-            <div className="absolute top-2 w-full h-2 bg-[#E8C4C4] rotate-12" />
-            <div className="absolute top-6 w-full h-2 bg-[#E8C4C4] rotate-12" />
-          </div>
-          {/* Wick */}
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-[2px] h-3 bg-[#4a4a4a]" />
-
-          {/* Flame */}
-          <AnimatePresence>
+            {/* Plate glow */}
             {!blown && (
-              <motion.div className="absolute -top-10 left-1/2 -translate-x-1/2 w-4 h-8"
-                style={{ originY: 1 }}
-                animate={{
-                  scale: [1, 1.1, 0.9, 1.05, 1],
-                  rotate: [-2, 3, -1, 2, -2],
-                  skewX: [-2, 2, -1, 1, -2],
-                }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                exit={{ scale: 0, opacity: 0, transition: { duration: 0.2 } }}>
-                <div className="w-full h-full rounded-[50%_50%_50%_50%/60%_60%_40%_40%]"
-                  style={{
-                    background: 'linear-gradient(to top, #ff9d00, #ffeb3b, rgba(255,255,255,0))',
-                    boxShadow: '0 0 15px #ff9d00, 0 0 30px #ffeb3b',
-                  }} />
-              </motion.div>
+              <motion.div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full pointer-events-none"
+                style={{ width: 240, height: 30, background: `radial-gradient(ellipse, rgba(255,140,0,0.2) 0%, transparent 70%)`, filter: 'blur(10px)' }}
+                animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
             )}
-          </AnimatePresence>
 
-          {/* Smoke */}
-          <AnimatePresence>
-            {smoke && (
-              <motion.div className="absolute -top-14 left-1/2 -translate-x-1/2 w-8 h-20 pointer-events-none"
-                initial={{ opacity: 0, y: 0 }}
-                animate={{ opacity: [0, 0.6, 0], y: -50, x: [0, -10, 10, -5] }}
-                transition={{ duration: 2.5, ease: 'easeOut' }}
-                exit={{ opacity: 0 }}>
-                <div className="w-full h-full rounded-full" style={{ background: 'radial-gradient(circle, rgba(100,100,100,0.2) 0%, transparent 70%)', filter: 'blur(5px)' }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+            {/* Candles */}
+            <div className="absolute flex items-end gap-2" style={{ bottom: 138, zIndex: 10 }}>
+              <Candle blown={blown} color="#FF88A0" small />
+              <Candle blown={blown} color="#A8D8FF" small />
+              <Candle blown={blown} color={GOLD} />
+              <Candle blown={blown} color="#FFD700" small />
+              <Candle blown={blown} color="#C8A0FF" small />
+            </div>
 
-        {/* Confetti Explosion on Blow */}
-        <AnimatePresence>
-          {blown && Array.from({ length: 30 }).map((_, i) => {
-            const angle = (i / 30) * Math.PI * 2;
-            const dist = 60 + Math.random() * 100;
-            return (
-              <motion.div key={i} className="absolute pointer-events-none"
-                style={{
-                  top: '40%', left: '50%',
-                  width: 4 + Math.random() * 4, height: 8 + Math.random() * 6,
-                  backgroundColor: i % 3 === 0 ? '#D4A574' : i % 3 === 1 ? '#E8C4C4' : '#F5E6D3',
-                  borderRadius: i % 2 === 0 ? '50%' : '2px',
-                }}
-                initial={{ x: 0, y: 0, opacity: 1, scale: 0, rotate: 0 }}
-                animate={{
-                  x: Math.cos(angle) * dist,
-                  y: Math.sin(angle) * dist + 50, // falls down slightly
-                  opacity: 0,
-                  scale: 1,
-                  rotate: Math.random() * 360,
-                }}
-                transition={{ duration: 1.5 + Math.random(), ease: 'easeOut' }}
-              />
-            );
-          })}
-        </AnimatePresence>
+            {/* Confetti */}
+            <AnimatePresence>
+              {blown && Array.from({ length: 40 }).map((_, i) => <ConfettiPiece key={i} i={i} total={40} />)}
+            </AnimatePresence>
+
+            {/* Top tier */}
+            <div className="absolute" style={{ bottom: 130, left: '50%', transform: 'translateX(-50%)', width: 150, height: 68 }}>
+              {/* Top surface */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 14, background: '#FFFDF9', borderRadius: '75px 75px 10px 10px', boxShadow: glowing ? `0 0 30px ${GOLD}50` : 'none', transition: 'box-shadow 1s' }} />
+              {/* Body */}
+              <div style={{ position: 'absolute', top: 8, left: 0, right: 0, bottom: 0, borderRadius: 12, background: 'linear-gradient(to right, #F0DEC8, #FAF0E6, #F5E6D3)', overflow: 'hidden' }}>
+                {/* Decoration dots */}
+                {[15, 35, 55, 75, 95].map(x => (
+                  <div key={x} style={{ position: 'absolute', top: '30%', left: `${x}%`, width: 5, height: 5, background: ROSE, borderRadius: '50%', opacity: 0.7 }} />
+                ))}
+              </div>
+              {/* Frosting drips */}
+              <svg className="absolute -top-1 left-0 w-full" viewBox="0 0 150 16" fill="#FFFDF9" style={{ filter: glowing ? `drop-shadow(0 0 8px ${GOLD}40)` : 'none' }}>
+                <path d="M0,0 Q8,12 16,4 Q24,16 32,6 Q40,14 48,4 Q56,16 64,6 Q72,12 80,3 Q88,14 96,5 Q104,14 112,4 Q120,12 128,3 Q136,14 144,5 Q148,10 150,0 Z" />
+              </svg>
+            </div>
+
+            {/* Bottom tier */}
+            <div className="absolute" style={{ bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 210, height: 115 }}>
+              {/* Surface */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: '#FFFDF9', borderRadius: '105px 105px 12px 12px' }} />
+              {/* Body */}
+              <div style={{ position: 'absolute', top: 10, left: 0, right: 0, bottom: 0, borderRadius: 14, background: 'linear-gradient(to right, #EDD5B8, #F5E6D3, #EDD5B8)', overflow: 'hidden' }}>
+                {/* Decorative stripe */}
+                <div style={{ position: 'absolute', top: '25%', left: 0, right: 0, height: 2, background: `${GOLD}30` }} />
+                <div style={{ position: 'absolute', top: '55%', left: 0, right: 0, height: 2, background: `${GOLD}20` }} />
+                {/* Floral pattern */}
+                {[20, 50, 80].map(x => (
+                  <div key={x} style={{ position: 'absolute', top: '35%', left: `${x}%`, width: 12, height: 12, borderRadius: '50%', border: `1px solid ${GOLD}25`, background: `${ROSE}15` }} />
+                ))}
+              </div>
+              {/* Frosting drips */}
+              <svg className="absolute -top-1 left-0 w-full" viewBox="0 0 210 20" fill="#FFFDF9" style={{ filter: glowing ? `drop-shadow(0 0 10px ${GOLD}40)` : 'none' }}>
+                <path d="M0,0 Q10,14 20,5 Q30,18 40,7 Q50,16 60,5 Q70,14 80,4 Q90,18 100,8 Q110,16 120,5 Q130,14 140,4 Q150,18 160,7 Q170,14 180,5 Q190,16 200,6 Q206,12 210,0 Z" />
+              </svg>
+              {/* Plate */}
+              <div style={{ position: 'absolute', bottom: -6, left: -8, right: -8, height: 10, background: 'linear-gradient(to bottom, #E8D5C0, #D4BFA5)', borderRadius: '50%', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} />
+            </div>
+
+            {/* Glow on blown */}
+            <AnimatePresence>
+              {glowing && (
+                <motion.div className="absolute inset-0 rounded-3xl pointer-events-none"
+                  initial={{ opacity: 0 }} animate={{ opacity: [0, 0.6, 0.3] }} exit={{ opacity: 0 }}
+                  style={{ background: `radial-gradient(ellipse at center 60%, ${GOLD}20 0%, transparent 70%)`, filter: 'blur(20px)' }} />
+              )}
+            </AnimatePresence>
+
+            {/* Click hint */}
+            <AnimatePresence>
+              {!blown && hovered && (
+                <motion.div className="absolute pointer-events-none z-20"
+                  style={{ bottom: 160, left: '50%', transform: 'translateX(-50%)' }}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <p className="font-serif italic" style={{ color: `${GOLD}90`, fontSize: '0.7rem', whiteSpace: 'nowrap', letterSpacing: '0.08em' }}>
+                    klik untuk tiup ✨
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.div>
       </motion.div>
 
+      {/* Message after blow */}
+      <AnimatePresence>
+        {showMsg && (
+          <motion.div className="mt-14 text-center px-8 z-10 max-w-md"
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}>
+            <div className="flex items-center justify-center gap-4 mb-5">
+              <div className="h-px flex-grow" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}40)` }} />
+              <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 1 L11.5 8 L18 10 L11.5 12 L10 19 L8.5 12 L2 10 L8.5 8Z" fill={GOLD} opacity="0.6" /></svg>
+              <div className="h-px flex-grow" style={{ background: `linear-gradient(270deg, transparent, ${GOLD}40)` }} />
+            </div>
+            <p className="font-serif leading-relaxed"
+              style={{ color: `${CHAMPAGNE}CC`, fontSize: 'clamp(1rem, 1.8vw, 1.2rem)', fontWeight: 300, lineHeight: 1.75 }}>
+              Semua harapanmu sudah diterbangkan ke semesta. Semoga semuanya jadi nyata, satu per satu, perlahan tapi pasti.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
